@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>POS - Système de Caisse</title>
+    <title>CuteSelling - Point de Vente</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
@@ -12,8 +12,9 @@
         .pos-app { max-width: 1600px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 25px 40px -12px rgba(0,0,0,0.2); overflow: hidden; }
         .app-header { background: #0f172a; color: white; padding: 0.8rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .logo-area { display: flex; align-items: center; gap: 15px; }
-        .store-logo { width: 50px; height: 50px; background: #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+        .store-logo { width: 55px; height: 55px; background: #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
         .store-info h2 { font-size: 1.3rem; }
+        .store-info h2 span { font-weight: normal; font-size: 0.8rem; color: #f97316; }
         .store-info p { font-size: 0.7rem; opacity: 0.8; }
         .user-info { display: flex; align-items: center; gap: 15px; background: #1e293b; padding: 5px 15px; border-radius: 40px; }
         .logout-btn { background: #dc2626; border: none; color: white; padding: 5px 12px; border-radius: 30px; cursor: pointer; }
@@ -54,10 +55,10 @@
 <div class="pos-app" id="posApp">
     <div class="app-header">
         <div class="logo-area">
-            <div class="store-logo" id="C:\Users\rthom\OneDrive\Images\Screenshots"><i class="fas fa-store"></i></div>
+            <div class="store-logo" id="storeLogoDisplay"><i class="fas fa-heart"></i><i class="fas fa-shopping-cart" style="font-size: 0.9rem; margin-left: -12px;"></i></div>
             <div class="store-info">
-                <h2 id="storeNameDisplay">CuteSelling</h2>
-                <p id="storeContactDisplay">📞 +509 3751 8773 | 📍 Ruelle Etoile Madeline</p>
+                <h2 id="storeNameDisplay">CuteSelling <span>Your Daily Dose of Business at Best Selling</span></h2>
+                <p id="storeContactDisplay">📞 509 3751 8773 / 4789 4692 | 📍 7 ruelle etoile, madeline cap-haïtien</p>
             </div>
         </div>
         <div class="user-info">
@@ -162,19 +163,21 @@
         <div class="settings-panel">
             <h4>Informations du magasin</h4>
             <label>Nom du magasin:</label>
-            <input type="text" id="storeName" placeholder="Nom du magasin">
+            <input type="text" id="storeName" placeholder="Nom du magasin" value="CuteSelling">
+            <label>Slogan:</label>
+            <input type="text" id="storeSlogan" placeholder="Slogan" value="Your Daily Dose of Business at Best Selling">
             <label>Logo (icône Font Awesome):</label>
-            <input type="text" id="storeLogoIcon" placeholder="ex: fa-store, fa-shop, fa-cart-shopping">
+            <input type="text" id="storeLogoIcon" placeholder="ex: fa-store, fa-heart" value="fa-heart">
             <label>Téléphone:</label>
-            <input type="text" id="storePhone" placeholder="+509 0000 0000">
+            <input type="text" id="storePhone" placeholder="Téléphone" value="509 3751 8773 / 4789 4692">
             <label>Adresse:</label>
-            <textarea id="storeAddress" rows="2" placeholder="Adresse complète"></textarea>
+            <textarea id="storeAddress" rows="2" placeholder="Adresse">7 ruelle etoile, madeline cap-haïtien</textarea>
             <label>Message de remerciement:</label>
-            <textarea id="thankYouMessage" rows="2">Merci pour votre achat ! À bientôt dans notre boutique.</textarea>
+            <textarea id="thankYouMessage" rows="2">Merci pour votre achat chez CuteSelling ! À bientôt !</textarea>
             <button id="saveSettingsBtn" class="success-btn" style="margin-top:10px;"><i class="fas fa-save"></i> Sauvegarder</button>
         </div>
     </div>
-    <footer>🔐 Système de caisse complet - Toutes les données sont sauvegardées localement</footer>
+    <footer>❤️ CuteSelling - Votre boutique en confiance | Tous droits réservés</footer>
 </div>
 
 <script>
@@ -185,11 +188,12 @@
     let currentCart = [];
     let appliedDiscount = { code: null, amount: 0 };
     let storeSettings = {
-        name: "Ma Boutique",
-        logoIcon: "fa-store",
-        phone: "+509 0000 0000",
-        address: "Rue Principal, Port-au-Prince",
-        thankYouMessage: "Merci pour votre achat ! À bientôt dans notre boutique."
+        name: "CuteSelling",
+        slogan: "Your Daily Dose of Business at Best Selling",
+        logoIcon: "fa-heart",
+        phone: "509 3751 8773 / 4789 4692",
+        address: "7 ruelle etoile, madeline cap-haïtien",
+        thankYouMessage: "Merci pour votre achat chez CuteSelling ! À bientôt !"
     };
 
     // ==================== CHARGEMENT/SAUVEGARDE ====================
@@ -221,12 +225,16 @@
     function getUsers() { return JSON.parse(localStorage.getItem("pos_users")); }
     
     function applyStoreSettings() {
-        document.getElementById('storeNameDisplay').innerText = storeSettings.name;
+        const sloganHtml = storeSettings.slogan ? `<span>${escapeHtml(storeSettings.slogan)}</span>` : '';
+        document.getElementById('storeNameDisplay').innerHTML = `${escapeHtml(storeSettings.name)} ${sloganHtml}`;
         document.getElementById('storeContactDisplay').innerHTML = `📞 ${storeSettings.phone} | 📍 ${storeSettings.address}`;
         const logoDiv = document.querySelector('.store-logo');
         if(logoDiv) logoDiv.innerHTML = `<i class="fas ${storeSettings.logoIcon}"></i>`;
+        
         const nameInput = document.getElementById('storeName');
         if(nameInput) nameInput.value = storeSettings.name;
+        const sloganInput = document.getElementById('storeSlogan');
+        if(sloganInput) sloganInput.value = storeSettings.slogan || '';
         const logoInput = document.getElementById('storeLogoIcon');
         if(logoInput) logoInput.value = storeSettings.logoIcon;
         const phoneInput = document.getElementById('storePhone');
@@ -243,7 +251,7 @@
         const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const day = date.getDate().toString().padStart(2, '0');
         const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        return `CMD-${year}${month}${day}-${random}`;
+        return `CS-${year}${month}${day}-${random}`;
     }
     
     // ==================== AUTHENTIFICATION ====================
@@ -445,19 +453,20 @@
         const doc = new jsPDF();
         doc.setFontSize(16);
         doc.text(storeSettings.name, 20, 20);
+        if(storeSettings.slogan) { doc.setFontSize(9); doc.text(storeSettings.slogan, 20, 28); }
         doc.setFontSize(10);
-        doc.text(storeSettings.phone, 20, 28);
-        doc.text(storeSettings.address, 20, 34);
-        doc.text(`Date: ${new Date().toLocaleString()}`, 20, 45);
-        doc.text("---", 20, 50);
-        let y = 58;
+        doc.text(storeSettings.phone, 20, 38);
+        doc.text(storeSettings.address, 20, 44);
+        doc.text(`Date: ${new Date().toLocaleString()}`, 20, 54);
+        doc.text("---", 20, 60);
+        let y = 68;
         currentCart.forEach(item => {
             doc.text(`${item.name} x${item.quantity} = ${(item.price*item.quantity).toFixed(0)} Gdes`, 20, y);
             y+=6;
         });
         doc.text(`Total: ${total.toFixed(0)} Gourdes`, 20, y+6);
         doc.text(storeSettings.thankYouMessage, 20, y+16);
-        doc.save(`ticket_${Date.now()}.pdf`);
+        doc.save(`ticket_CuteSelling_${Date.now()}.pdf`);
     }
     
     function renderHistory() {
@@ -470,7 +479,7 @@
         tbody.innerHTML = '';
         salesHistory.forEach(sale => {
             const itemsShort = sale.items.map(i=>`${i.name} x${i.quantity}`).join(', ');
-            tbody.insertAdjacentHTML('beforeend', `<tr><td class="order-code">${sale.code}</td><td>${sale.date}</td><td>${itemsShort.substring(0,50)}</td><td>${sale.total.toFixed(0)} Gdes</td><td>${sale.method}</td><td><button class="viewTicketBtn" data-id="${sale.id}"><i class="fas fa-receipt"></i> Ticket</button></td>`);
+            tbody.insertAdjacentHTML('beforeend', `<tr><td class="order-code">${sale.code}</td><td>${sale.date}</td><td>${itemsShort.substring(0,50)}</td><td>${sale.total.toFixed(0)} Gdes</td><td>${sale.method}</td><td><button class="viewTicketBtn" data-id="${sale.id}"><i class="fas fa-receipt"></i> Ticket</button></td></tr>`);
         });
         document.querySelectorAll('.viewTicketBtn').forEach(btn => btn.addEventListener('click', (e) => { const id = parseInt(btn.dataset.id); const sale = salesHistory.find(s => s.id === id); if(sale) generateTicketFromSale(sale); }));
     }
@@ -511,7 +520,7 @@
                     <button class="saveStockBtn" data-id="${prod.id}" style="background:#10b981; color:white; border:none; padding:5px 10px; border-radius:10px;">💾 Sauver</button>
                     <button class="deleteProductBtn" data-id="${prod.id}" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:10px;">🗑️ Supprimer</button>
                 </td>
-            `);
+            </tr>` );
         });
         document.querySelectorAll('.saveStockBtn').forEach(btn => btn.addEventListener('click', () => {
             const id = parseInt(btn.dataset.id);
@@ -537,7 +546,7 @@
     
     function renderUserManagement() {
         if (!currentUser || currentUser.role !== 'admin') { 
-            document.getElementById('usersBody').innerHTML = "<tr><td colspan='3'>⛔ Accès réservé administrateur.</td></tr>"; 
+            document.getElementById('usersBody').innerHTML = "<tr><td colspan='3'>⛔ Accès réservé administrateur. </tr>"; 
             return; 
         }
         const tbody = document.getElementById('usersBody');
@@ -591,6 +600,7 @@
     
     function saveSettings() {
         storeSettings.name = document.getElementById('storeName').value;
+        storeSettings.slogan = document.getElementById('storeSlogan').value;
         storeSettings.logoIcon = document.getElementById('storeLogoIcon').value;
         storeSettings.phone = document.getElementById('storePhone').value;
         storeSettings.address = document.getElementById('storeAddress').value;
