@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>POS - Système de Caisse</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: #eef2f5; padding: 20px; }
+        .pos-app { max-width: 1600px; margin: 0 auto; background: white; border-radius: 28px; box-shadow: 0 25px 40px -12px rgba(0,0,0,0.2); overflow: hidden; }
+        .app-header { background: #0f172a; color: white; padding: 0.8rem 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .logo-area { display: flex; align-items: center; gap: 15px; }
+        .store-logo { width: 50px; height: 50px; background: #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
+        .store-info h2 { font-size: 1.3rem; }
+        .store-info p { font-size: 0.7rem; opacity: 0.8; }
+        .user-info { display: flex; align-items: center; gap: 15px; background: #1e293b; padding: 5px 15px; border-radius: 40px; }
+        .logout-btn { background: #dc2626; border: none; color: white; padding: 5px 12px; border-radius: 30px; cursor: pointer; }
+        .tabs { display: flex; background: #f1f5f9; padding: 0 1.5rem; gap: 0.5rem; flex-wrap: wrap; }
+        .tab-btn { background: transparent; border: none; padding: 1rem 1.5rem; font-weight: 600; cursor: pointer; color: #334155; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: #f97316; border-bottom-color: #f97316; background: white; }
+        .tab-content { display: none; padding: 1.8rem; }
+        .tab-content.active { display: block; }
+        .pos-layout { display: flex; flex-wrap: wrap; gap: 1.8rem; }
+        .products-panel { flex: 2; min-width: 260px; }
+        .cart-panel { flex: 1.3; min-width: 320px; background: #fefefe; border-radius: 24px; border: 1px solid #eef2ff; padding: 1rem; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .product-card { background: white; border-radius: 20px; padding: 0.8rem; text-align: center; border: 1px solid #e2e8f0; cursor: pointer; transition: 0.2s; }
+        .product-card:hover { border-color: #f97316; transform: translateY(-3px); }
+        .cart-items { max-height: 350px; overflow-y: auto; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; background: #f9fafb; margin: 8px 0; padding: 8px 12px; border-radius: 16px; flex-wrap: wrap; gap: 8px; }
+        .qty-control { display: flex; gap: 8px; align-items: center; }
+        .payment-methods { margin: 15px 0; display: flex; gap: 15px; }
+        .cash-input { margin: 10px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .promo-section { display: flex; gap: 8px; margin: 12px 0; }
+        button { cursor: pointer; }
+        .danger-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 30px; }
+        .success-btn { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 30px; }
+        .warning-btn { background: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 30px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
+        .modal { position: fixed; background: rgba(0,0,0,0.5); top:0; left:0; width:100%; height:100%; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 2rem; border-radius: 32px; width: 400px; max-width: 90%; }
+        .settings-panel { background: #f8fafc; padding: 1rem; border-radius: 20px; margin-top: 1rem; }
+        .settings-panel h4 { margin-bottom: 1rem; }
+        .settings-panel input, .settings-panel textarea { width: 100%; margin: 5px 0; padding: 8px; border-radius: 12px; border: 1px solid #ccc; }
+        footer { text-align: center; padding: 12px; background: #f8fafc; font-size: 0.7rem; }
+        .order-code { font-family: monospace; font-size: 1.2rem; font-weight: bold; color: #f97316; }
+        .empty-products { text-align: center; padding: 40px; color: #94a3b8; grid-column: span 3; }
+    </style>
+</head>
+<body>
+<div class="pos-app" id="posApp">
+    <div class="app-header">
+        <div class="logo-area">
+            <div class="store-logo" id="storeLogoDisplay"><i class="fas fa-store"></i></div>
+            <div class="store-info">
+                <h2 id="storeNameDisplay">Ma Boutique</h2>
+                <p id="storeContactDisplay">📞 +509 0000 0000 | 📍 Rue Principal</p>
+            </div>
+        </div>
+        <div class="user-info">
+            <span><i class="fas fa-user-shield"></i> <span id="currentUsername">Invité</span></span>
+            <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+    </div>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="vente"><i class="fas fa-cash-register"></i> Vente</button>
+        <button class="tab-btn" data-tab="historique"><i class="fas fa-history"></i> Historique</button>
+        <button class="tab-btn" data-tab="stock"><i class="fas fa-boxes"></i> Gestion Stock</button>
+        <button class="tab-btn" data-tab="users"><i class="fas fa-users"></i> Utilisateurs</button>
+        <button class="tab-btn" data-tab="settings"><i class="fas fa-store"></i> Paramètres</button>
+    </div>
+
+    <!-- Onglet VENTE -->
+    <div id="vente" class="tab-content active">
+        <div class="pos-layout">
+            <div class="products-panel">
+                <h3><i class="fas fa-tags"></i> Catalogue</h3>
+                <div class="product-grid" id="productGrid">
+                    <div class="empty-products">
+                        <i class="fas fa-box-open" style="font-size: 3rem; color: #cbd5e1;"></i>
+                        <p>Aucun produit pour le moment</p>
+                        <p>➡️ Allez dans l'onglet "Gestion Stock" pour ajouter vos produits</p>
+                    </div>
+                </div>
+            </div>
+            <div class="cart-panel">
+                <h3><i class="fas fa-shopping-cart"></i> Panier</h3>
+                <div id="cartItemsList" class="cart-items">
+                    <div style="text-align:center; padding:20px;">🛒 Panier vide</div>
+                </div>
+                <div class="promo-section">
+                    <input type="text" id="promoCode" placeholder="Code promo (PROMO10 = -10%)">
+                    <button id="applyPromoBtn" class="success-btn">Appliquer</button>
+                </div>
+                <div><strong>Sous-total:</strong> <span id="cartSubtotal">0</span> Gourdes</div>
+                <div><strong>Réduction:</strong> <span id="discountAmount">0</span> Gourdes</div>
+                <div><strong>TOTAL:</strong> <span id="cartTotal">0</span> Gourdes</div>
+                <div class="payment-methods">
+                    <label><input type="radio" name="paymentMethod" value="carte" checked> 💳 Carte bancaire</label>
+                    <label><input type="radio" name="paymentMethod" value="cash"> 💵 Espèces</label>
+                </div>
+                <div id="cashDetails" style="display:none;">
+                    <div class="cash-input">
+                        <span>Montant reçu (Gdes):</span>
+                        <input type="number" id="cashReceived" step="0.01" placeholder="0.00">
+                        <span>Rendu: <strong id="changeAmount">0</strong> Gdes</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap:10px; margin-top:15px; flex-wrap:wrap;">
+                    <button id="payBtn" class="success-btn" style="padding:12px 20px; flex:1;"><i class="fas fa-check-circle"></i> Payer</button>
+                    <button id="printTicketBtn" style="background:#3b82f6; padding:12px 20px; border-radius:40px; color:white; border:none;"><i class="fas fa-print"></i> Ticket PDF</button>
+                    <button id="clearCartBtn" class="danger-btn"><i class="fas fa-trash"></i> Vider</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onglet HISTORIQUE -->
+    <div id="historique" class="tab-content">
+        <h3>📜 Historique des ventes</h3>
+        <button id="refreshHistoryBtn" style="margin-bottom:12px;"><i class="fas fa-sync"></i> Actualiser</button>
+        <div style="overflow-x:auto;">
+            <table id="historyTable">
+                <thead><tr><th>Code</th><th>Date</th><th>Articles</th><th>Total</th><th>Paiement</th><th>Ticket</th></tr></thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="6" style="text-align:center;">Aucune vente enregistrée</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Onglet GESTION STOCK -->
+    <div id="stock" class="tab-content">
+        <h3><i class="fas fa-database"></i> Gestion des stocks</h3>
+        <button id="addProductBtn" class="success-btn" style="margin-bottom:12px;"><i class="fas fa-plus"></i> Ajouter produit</button>
+        <div id="stockTableContainer">
+            <table id="stockTable">
+                <thead><tr><th>ID</th><th>Nom</th><th>Prix (Gdes)</th><th>Stock</th><th>Actions</th></tr></thead>
+                <tbody id="stockBody">
+                    <tr><td colspan="5" style="text-align:center;">Aucun produit. Cliquez sur "Ajouter produit"</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Onglet UTILISATEURS -->
+    <div id="users" class="tab-content">
+        <h3><i class="fas fa-users"></i> Gestion des utilisateurs</h3>
+        <button id="addUserBtn" class="success-btn" style="margin-bottom:12px;"><i class="fas fa-user-plus"></i> Ajouter utilisateur</button>
+        <table id="usersTable">
+            <thead><tr><th>Nom d'utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>
+            <tbody id="usersBody"></tbody>
+        </table>
+    </div>
+
+    <!-- Onglet PARAMÈTRES -->
+    <div id="settings" class="tab-content">
+        <h3><i class="fas fa-sliders-h"></i> Paramètres du magasin</h3>
+        <div class="settings-panel">
+            <h4>Informations du magasin</h4>
+            <label>Nom du magasin:</label>
+            <input type="text" id="storeName" placeholder="Nom du magasin">
+            <label>Logo (icône Font Awesome):</label>
+            <input type="text" id="storeLogoIcon" placeholder="ex: fa-store, fa-shop, fa-cart-shopping">
+            <label>Téléphone:</label>
+            <input type="text" id="storePhone" placeholder="+509 0000 0000">
+            <label>Adresse:</label>
+            <textarea id="storeAddress" rows="2" placeholder="Adresse complète"></textarea>
+            <label>Message de remerciement:</label>
+            <textarea id="thankYouMessage" rows="2">Merci pour votre achat ! À bientôt dans notre boutique.</textarea>
+            <button id="saveSettingsBtn" class="success-btn" style="margin-top:10px;"><i class="fas fa-save"></i> Sauvegarder</button>
+        </div>
+    </div>
+    <footer>🔐 Système de caisse complet - Toutes les données sont sauvegardées localement</footer>
+</div>
+
+<script>
+    // ==================== DONNÉES ====================
+    let currentUser = null;
+    let products = [];
+    let salesHistory = [];
+    let currentCart = [];
+    let appliedDiscount = { code: null, amount: 0 };
+    let storeSettings = {
+        name: "Ma Boutique",
+        logoIcon: "fa-store",
+        phone: "+509 0000 0000",
+        address: "Rue Principal, Port-au-Prince",
+        thankYouMessage: "Merci pour votre achat ! À bientôt dans notre boutique."
+    };
+
+    // ==================== CHARGEMENT/SAUVEGARDE ====================
+    function loadData() {
+        const storedProducts = localStorage.getItem("pos_products");
+        products = storedProducts ? JSON.parse(storedProducts) : [];
+        
+        const storedSales = localStorage.getItem("pos_sales");
+        salesHistory = storedSales ? JSON.parse(storedSales) : [];
+        
+        const storedUsers = localStorage.getItem("pos_users");
+        if (!storedUsers) {
+            localStorage.setItem("pos_users", JSON.stringify([
+                { username: "admin", password: "admin", role: "admin" },
+                { username: "vendeur", password: "1234", role: "user" }
+            ]));
+        }
+        
+        const storedSettings = localStorage.getItem("pos_settings");
+        if (storedSettings) storeSettings = JSON.parse(storedSettings);
+        applyStoreSettings();
+    }
+    
+    function saveProducts() { localStorage.setItem("pos_products", JSON.stringify(products)); }
+    function saveSales() { localStorage.setItem("pos_sales", JSON.stringify(salesHistory)); }
+    function saveSettings() { localStorage.setItem("pos_settings", JSON.stringify(storeSettings)); applyStoreSettings(); }
+    
+    function saveUsers(users) { localStorage.setItem("pos_users", JSON.stringify(users)); }
+    function getUsers() { return JSON.parse(localStorage.getItem("pos_users")); }
+    
+    function applyStoreSettings() {
+        document.getElementById('storeNameDisplay').innerText = storeSettings.name;
+        document.getElementById('storeContactDisplay').innerHTML = `📞 ${storeSettings.phone} | 📍 ${storeSettings.address}`;
+        const logoDiv = document.querySelector('.store-logo');
+        if(logoDiv) logoDiv.innerHTML = `<i class="fas ${storeSettings.logoIcon}"></i>`;
+        const nameInput = document.getElementById('storeName');
+        if(nameInput) nameInput.value = storeSettings.name;
+        const logoInput = document.getElementById('storeLogoIcon');
+        if(logoInput) logoInput.value = storeSettings.logoIcon;
+        const phoneInput = document.getElementById('storePhone');
+        if(phoneInput) phoneInput.value = storeSettings.phone;
+        const addressInput = document.getElementById('storeAddress');
+        if(addressInput) addressInput.value = storeSettings.address;
+        const thankInput = document.getElementById('thankYouMessage');
+        if(thankInput) thankInput.value = storeSettings.thankYouMessage;
+    }
+    
+    function generateOrderCode() {
+        const date = new Date();
+        const year = date.getFullYear().toString().slice(-2);
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        return `CMD-${year}${month}${day}-${random}`;
+    }
+    
+    // ==================== AUTHENTIFICATION ====================
+    function showLoginModal() {
+        const modalHtml = `<div id="loginModal" class="modal"><div class="modal-content"><h3>🔐 Connexion caisse</h3><input type="text" id="loginUser" placeholder="Identifiant" style="width:100%; margin:8px 0; padding:8px;"><input type="password" id="loginPass" placeholder="Mot de passe" style="width:100%; margin:8px 0; padding:8px;"><button id="doLoginBtn" style="margin-top:12px; width:100%; background:#f97316; color:white; border:none; padding:10px; border-radius:30px;">Se connecter</button></div></div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        document.getElementById('doLoginBtn').addEventListener('click', () => {
+            const user = document.getElementById('loginUser').value;
+            const pwd = document.getElementById('loginPass').value;
+            const users = getUsers();
+            const found = users.find(u => u.username === user && u.password === pwd);
+            if (found) {
+                currentUser = { username: found.username, role: found.role };
+                localStorage.setItem("pos_current_user", JSON.stringify(currentUser));
+                document.getElementById('currentUsername').innerText = currentUser.username;
+                document.getElementById('loginModal').remove();
+                renderAll();
+            } else alert("❌ Identifiants invalides");
+        });
+    }
+    
+    function checkAuth() {
+        const savedUser = localStorage.getItem("pos_current_user");
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            document.getElementById('currentUsername').innerText = currentUser.username;
+            return true;
+        } else { showLoginModal(); return false; }
+    }
+    
+    function logout() { localStorage.removeItem("pos_current_user"); location.reload(); }
+    
+    // ==================== GESTION PRODUITS ====================
+    function renderProducts() {
+        const container = document.getElementById('productGrid');
+        if (!container) return;
+        
+        if(products.length === 0) {
+            container.innerHTML = `<div class="empty-products">
+                <i class="fas fa-box-open" style="font-size: 3rem; color: #cbd5e1;"></i>
+                <p>Aucun produit pour le moment</p>
+                <p>➡️ Allez dans l'onglet "Gestion Stock" pour ajouter vos produits</p>
+            </div>`;
+            return;
+        }
+        
+        let html = '';
+        products.forEach(prod => {
+            const isOut = prod.stock <= 0;
+            html += `<div class="product-card ${isOut ? 'out-of-stock' : ''}" data-id="${prod.id}">
+                        <i class="fas ${prod.icon || 'fa-tag'}" style="font-size:2rem; color:#f97316;"></i>
+                        <div><strong>${escapeHtml(prod.name)}</strong></div>
+                        <div>${prod.price.toFixed(0)} Gourdes</div>
+                        <div class="product-stock">📦 stock: ${prod.stock}</div>
+                        ${!isOut ? `<button class="add-to-cart-btn" data-id="${prod.id}" style="margin-top:8px; background:#f97316; border:none; padding:5px 12px; border-radius:20px; color:white;"><i class="fas fa-cart-plus"></i> Ajouter</button>` : '<span style="color:red;">Rupture</span>'}
+                    </div>`;
+        });
+        container.innerHTML = html;
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); addToCart(parseInt(btn.dataset.id)); });
+        });
+    }
+    
+    function addToCart(productId) {
+        const product = products.find(p => p.id === productId);
+        if (!product || product.stock <= 0) { alert("Stock insuffisant"); return; }
+        const existing = currentCart.find(i => i.productId === productId);
+        if (existing) {
+            if (existing.quantity + 1 > product.stock) { alert(`Stock max atteint (${product.stock})`); return; }
+            existing.quantity++;
+        } else {
+            currentCart.push({ productId, name: product.name, price: product.price, quantity: 1 });
+        }
+        renderCartUI();
+    }
+    
+    function updateCartQuantity(productId, delta) {
+        const idx = currentCart.findIndex(i => i.productId === productId);
+        if (idx === -1) return;
+        const productStock = products.find(p => p.id === productId).stock;
+        const newQty = currentCart[idx].quantity + delta;
+        if (newQty <= 0) currentCart.splice(idx,1);
+        else if (newQty > productStock) { alert(`Stock disponible: ${productStock}`); return; }
+        else currentCart[idx].quantity = newQty;
+        renderCartUI();
+    }
+    
+    function removeCartItem(productId) { currentCart = currentCart.filter(i => i.productId !== productId); renderCartUI(); }
+    
+    function renderCartUI() {
+        const container = document.getElementById('cartItemsList');
+        let subtotal = 0;
+        let html = '';
+        currentCart.forEach(item => { 
+            const lineTotal = item.price * item.quantity; 
+            subtotal += lineTotal; 
+            html += `<div class="cart-item">
+                        <div><strong>${escapeHtml(item.name)}</strong><br>${item.price.toFixed(0)} Gdes x ${item.quantity}</div>
+                        <div>${lineTotal.toFixed(0)} Gdes</div>
+                        <div class="qty-control">
+                            <button class="qty-inc" data-id="${item.productId}">+</button>
+                            <button class="qty-dec" data-id="${item.productId}">-</button>
+                            <button class="remove-item" data-id="${item.productId}"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>`;
+        });
+        if (currentCart.length === 0) html = '<div style="text-align:center; padding:20px;">🛒 Panier vide</div>';
+        container.innerHTML = html;
+        let discount = appliedDiscount.amount;
+        let total = subtotal - discount;
+        if (total < 0) total = 0;
+        document.getElementById('cartSubtotal').innerText = subtotal.toFixed(0);
+        document.getElementById('discountAmount').innerText = discount.toFixed(0);
+        document.getElementById('cartTotal').innerText = total.toFixed(0);
+        document.querySelectorAll('.qty-inc').forEach(btn => btn.addEventListener('click', () => updateCartQuantity(parseInt(btn.dataset.id), 1)));
+        document.querySelectorAll('.qty-dec').forEach(btn => btn.addEventListener('click', () => updateCartQuantity(parseInt(btn.dataset.id), -1)));
+        document.querySelectorAll('.remove-item').forEach(btn => btn.addEventListener('click', () => removeCartItem(parseInt(btn.dataset.id))));
+        handleCashChangeDisplay();
+    }
+    
+    function handleCashChangeDisplay() {
+        const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+        const cashDiv = document.getElementById('cashDetails');
+        cashDiv.style.display = method === 'cash' ? 'block' : 'none';
+        if (method === 'cash') {
+            const cashReceived = parseFloat(document.getElementById('cashReceived')?.value) || 0;
+            const total = parseFloat(document.getElementById('cartTotal').innerText);
+            const change = cashReceived - total;
+            document.getElementById('changeAmount').innerText = change >=0 ? change.toFixed(0) : "0";
+        }
+    }
+    
+    function applyPromo() {
+        const code = document.getElementById('promoCode').value.trim().toUpperCase();
+        let discountAmount = 0;
+        const subtotal = parseFloat(document.getElementById('cartSubtotal').innerText);
+        if (code === "PROMO10") discountAmount = 0.10 * subtotal;
+        else if (code === "BIENVENUE5") discountAmount = 5;
+        else if (code.startsWith("-")) discountAmount = Math.abs(parseFloat(code));
+        else { alert("Code invalide. Essayer: PROMO10 (10%), BIENVENUE5 (5 Gourdes)"); return; }
+        appliedDiscount = { code, amount: Math.min(discountAmount, subtotal) };
+        renderCartUI();
+    }
+    
+    function finalizePayment() {
+        if (currentCart.length === 0) { alert("Panier vide."); return; }
+        const total = parseFloat(document.getElementById('cartTotal').innerText);
+        const method = document.querySelector('input[name="paymentMethod"]:checked').value;
+        let received = total, change = 0;
+        if (method === 'cash') {
+            received = parseFloat(document.getElementById('cashReceived').value);
+            if (isNaN(received) || received < total) { alert("Montant insuffisant"); return; }
+            change = received - total;
+        }
+        // Vérifier stock
+        for (let item of currentCart) {
+            const prod = products.find(p => p.id === item.productId);
+            if (prod.stock < item.quantity) { alert(`Stock insuffisant pour ${prod.name}`); return; }
+        }
+        // Déduire stock
+        for (let item of currentCart) {
+            const prod = products.find(p => p.id === item.productId);
+            prod.stock -= item.quantity;
+        }
+        saveProducts();
+        
+        const orderCode = generateOrderCode();
+        const sale = {
+            id: Date.now(),
+            code: orderCode,
+            date: new Date().toLocaleString(),
+            items: [...currentCart],
+            total: total,
+            method: method,
+            received: method === 'cash' ? received : null,
+            change: method === 'cash' ? change : null,
+            discountCode: appliedDiscount.code,
+            discountAmount: appliedDiscount.amount
+        };
+        salesHistory.unshift(sale);
+        saveSales();
+        
+        alert(`✅ ${storeSettings.thankYouMessage}\n\n📦 Code commande: ${orderCode}\n💰 Total: ${total.toFixed(0)} Gourdes\n💳 Paiement: ${method === 'cash' ? `Espèces (Rendu: ${change.toFixed(0)} Gdes)` : 'Carte'}`);
+        
+        currentCart = [];
+        appliedDiscount = { code: null, amount: 0 };
+        document.getElementById('promoCode').value = '';
+        document.getElementById('cashReceived').value = '';
+        renderCartUI();
+        renderProducts();
+        renderHistory();
+        if(document.getElementById('stock').classList.contains('active')) renderStockManagement();
+    }
+    
+    async function printTicketPDF() {
+        if (currentCart.length === 0) { alert("Aucune vente en cours"); return; }
+        const total = parseFloat(document.getElementById('cartTotal').innerText);
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(storeSettings.name, 20, 20);
+        doc.setFontSize(10);
+        doc.text(storeSettings.phone, 20, 28);
+        doc.text(storeSettings.address, 20, 34);
+        doc.text(`Date: ${new Date().toLocaleString()}`, 20, 45);
+        doc.text("---", 20, 50);
+        let y = 58;
+        currentCart.forEach(item => {
+            doc.text(`${item.name} x${item.quantity} = ${(item.price*item.quantity).toFixed(0)} Gdes`, 20, y);
+            y+=6;
+        });
+        doc.text(`Total: ${total.toFixed(0)} Gourdes`, 20, y+6);
+        doc.text(storeSettings.thankYouMessage, 20, y+16);
+        doc.save(`ticket_${Date.now()}.pdf`);
+    }
+    
+    function renderHistory() {
+        const tbody = document.getElementById('historyBody');
+        if (!tbody) return;
+        if(salesHistory.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune vente enregistrée</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        salesHistory.forEach(sale => {
+            const itemsShort = sale.items.map(i=>`${i.name} x${i.quantity}`).join(', ');
+            tbody.insertAdjacentHTML('beforeend', `<tr><td class="order-code">${sale.code}</td><td>${sale.date}</td><td>${itemsShort.substring(0,50)}</td><td>${sale.total.toFixed(0)} Gdes</td><td>${sale.method}</td><td><button class="viewTicketBtn" data-id="${sale.id}"><i class="fas fa-receipt"></i> Ticket</button></td>`);
+        });
+        document.querySelectorAll('.viewTicketBtn').forEach(btn => btn.addEventListener('click', (e) => { const id = parseInt(btn.dataset.id); const sale = salesHistory.find(s => s.id === id); if(sale) generateTicketFromSale(sale); }));
+    }
+    
+    function generateTicketFromSale(sale) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text(storeSettings.name, 20, 20);
+        doc.text(`Code: ${sale.code}`, 20, 30);
+        doc.text(`Date: ${sale.date}`, 20, 38);
+        let y=48;
+        sale.items.forEach(item => { doc.text(`${item.name} x${item.quantity} = ${(item.price*item.quantity).toFixed(0)} Gdes`, 20, y); y+=6; });
+        doc.text(`Total: ${sale.total.toFixed(0)} Gourdes`, 20, y+6);
+        doc.save(`ticket_${sale.code}.pdf`);
+    }
+    
+    function renderStockManagement() {
+        if (!currentUser || currentUser.role !== 'admin') { 
+            document.getElementById('stockTableContainer').innerHTML = "<p style='color:red'>⛔ Accès réservé administrateur.</p>"; 
+            return; 
+        }
+        const tbody = document.getElementById('stockBody');
+        if (!tbody) return;
+        
+        if(products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Aucun produit. Cliquez sur "Ajouter produit"</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        products.forEach(prod => {
+            tbody.insertAdjacentHTML('beforeend', `<tr>
+                <td>${prod.id}</td>
+                <td><input type="text" class="edit-name" data-id="${prod.id}" value="${escapeHtml(prod.name)}"></td>
+                <td><input type="number" class="edit-price" data-id="${prod.id}" value="${prod.price}" step="1"></td>
+                <td><input type="number" class="edit-stock" data-id="${prod.id}" value="${prod.stock}" step="1"></td>
+                <td>
+                    <button class="saveStockBtn" data-id="${prod.id}" style="background:#10b981; color:white; border:none; padding:5px 10px; border-radius:10px;">💾 Sauver</button>
+                    <button class="deleteProductBtn" data-id="${prod.id}" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:10px;">🗑️ Supprimer</button>
+                </td>
+            `);
+        });
+        document.querySelectorAll('.saveStockBtn').forEach(btn => btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            const newName = document.querySelector(`.edit-name[data-id="${id}"]`).value;
+            const newPrice = parseFloat(document.querySelector(`.edit-price[data-id="${id}"]`).value);
+            const newStock = parseInt(document.querySelector(`.edit-stock[data-id="${id}"]`).value);
+            const prod = products.find(p => p.id === id);
+            if(prod) { prod.name = newName; prod.price = newPrice; prod.stock = newStock; }
+            saveProducts();
+            renderProducts();
+            renderStockManagement();
+        }));
+        document.querySelectorAll('.deleteProductBtn').forEach(btn => btn.addEventListener('click', () => {
+            const id = parseInt(btn.dataset.id);
+            if(confirm("Supprimer ce produit définitivement ?")) {
+                products = products.filter(p => p.id !== id);
+                saveProducts();
+                renderProducts();
+                renderStockManagement();
+            }
+        }));
+    }
+    
+    function renderUserManagement() {
+        if (!currentUser || currentUser.role !== 'admin') { 
+            document.getElementById('usersBody').innerHTML = "<tr><td colspan='3'>⛔ Accès réservé administrateur.</td></tr>"; 
+            return; 
+        }
+        const tbody = document.getElementById('usersBody');
+        const users = getUsers();
+        tbody.innerHTML = '';
+        users.forEach(user => {
+            tbody.insertAdjacentHTML('beforeend', `<tr>
+                <td>${user.username}</td>
+                <td>${user.role}</td>
+                <td>${user.username !== 'admin' ? `<button class="deleteUserBtn" data-user="${user.username}" style="background:#ef4444; color:white; border:none; padding:5px 10px; border-radius:10px;">🗑️ Supprimer</button>` : 'Admin principal'}</td>
+            </tr>`);
+        });
+        document.querySelectorAll('.deleteUserBtn').forEach(btn => btn.addEventListener('click', () => {
+            const username = btn.dataset.user;
+            if(confirm(`Supprimer l'utilisateur "${username}" ?`)) {
+                let users = getUsers();
+                users = users.filter(u => u.username !== username);
+                saveUsers(users);
+                renderUserManagement();
+            }
+        }));
+    }
+    
+    function addProduct() {
+        const newId = Date.now();
+        const newName = prompt("Nom du produit:", "Nouveau produit");
+        if(!newName) return;
+        const newPrice = parseFloat(prompt("Prix en Gourdes:", "50"));
+        if(isNaN(newPrice)) return;
+        const newStock = parseInt(prompt("Stock initial:", "10"));
+        if(isNaN(newStock)) return;
+        
+        products.push({ id: newId, name: newName, price: newPrice, stock: newStock, icon: "fa-box" });
+        saveProducts();
+        renderStockManagement();
+        renderProducts();
+    }
+    
+    function addUser() {
+        const username = prompt("Nom d'utilisateur:");
+        if(!username) return;
+        const password = prompt("Mot de passe:");
+        if(!password) return;
+        const role = prompt("Rôle (admin/user):", "user");
+        let users = getUsers();
+        if(users.find(u => u.username === username)) { alert("Utilisateur existe déjà"); return; }
+        users.push({ username, password, role: role === 'admin' ? 'admin' : 'user' });
+        saveUsers(users);
+        renderUserManagement();
+    }
+    
+    function saveSettings() {
+        storeSettings.name = document.getElementById('storeName').value;
+        storeSettings.logoIcon = document.getElementById('storeLogoIcon').value;
+        storeSettings.phone = document.getElementById('storePhone').value;
+        storeSettings.address = document.getElementById('storeAddress').value;
+        storeSettings.thankYouMessage = document.getElementById('thankYouMessage').value;
+        saveSettings();
+        alert("Paramètres sauvegardés !");
+    }
+    
+    function renderAll() {
+        renderProducts();
+        renderCartUI();
+        if(document.getElementById('historique').classList.contains('active')) renderHistory();
+        if(document.getElementById('stock').classList.contains('active')) renderStockManagement();
+        if(document.getElementById('users').classList.contains('active')) renderUserManagement();
+    }
+    
+    function initTabs() {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                if (tabId === 'historique') renderHistory();
+                if (tabId === 'stock') renderStockManagement();
+                if (tabId === 'users') renderUserManagement();
+            });
+        });
+    }
+    
+    function bindEvents() {
+        document.getElementById('payBtn')?.addEventListener('click', finalizePayment);
+        document.getElementById('printTicketBtn')?.addEventListener('click', printTicketPDF);
+        document.getElementById('clearCartBtn')?.addEventListener('click', () => { currentCart = []; renderCartUI(); });
+        document.getElementById('applyPromoBtn')?.addEventListener('click', applyPromo);
+        document.querySelectorAll('input[name="paymentMethod"]').forEach(r => r.addEventListener('change', handleCashChangeDisplay));
+        document.getElementById('cashReceived')?.addEventListener('input', handleCashChangeDisplay);
+        document.getElementById('logoutBtn')?.addEventListener('click', logout);
+        document.getElementById('refreshHistoryBtn')?.addEventListener('click', renderHistory);
+        document.getElementById('addProductBtn')?.addEventListener('click', addProduct);
+        document.getElementById('addUserBtn')?.addEventListener('click', addUser);
+        document.getElementById('saveSettingsBtn')?.addEventListener('click', saveSettings);
+    }
+    
+    function escapeHtml(str) { return String(str).replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+    
+    // Initialisation
+    loadData();
+    checkAuth();
+    initTabs();
+    bindEvents();
+    renderAll();
+</script>
+</body>
+</html>
